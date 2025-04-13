@@ -1,12 +1,14 @@
-import pymssql
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
+import pymssql
 import hashlib
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True) 
 
-app.secret_key = 'Equipo1'  # Usa una clave segura en producción
+# Permitir CORS desde el dominio específico
+CORS(app, origins=["https://musical-space-xylophone-jjj7j9j7vr6vc59wx-3000.app.github.dev"], supports_credentials=True)
+
+app.secret_key = 'Equipo1'
 
 SERVER = 'localhost'
 DATABASE = 'Data'
@@ -32,8 +34,6 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    print(f'recibido del frontend: {username}, {password}\n')
-
     if not username or not password:
         return jsonify({'error': 'Se requiere usuario y contraseña'}), 400
 
@@ -47,17 +47,13 @@ def login():
                 JOIN Profesor p ON u.matricula = p.matricula
                 WHERE u.matricula = %s
             """, (username,))
-            
+
             user = cursor.fetchone()
-            print('Usuario desde BD (resultado del JOIN):', user)
 
             if user:
                 hashed_provided_password = hashlib.sha256(password.encode()).digest()
 
-                print(f"\nHash de la contraseña almacenada: {user['passwordHash']}")
-                print(f"Hash de la contraseña proporcionada (digest): {hashed_provided_password}\n")
-
-                if bytes(user['passwordHash']) == hashed_provided_password:
+                if user['passwordHash'] == hashed_provided_password:
                     session['username'] = username
                     session['rol'] = user['rol']
                     if user['rol'] == 'Administrador':
