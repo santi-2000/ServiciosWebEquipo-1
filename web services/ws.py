@@ -1,18 +1,17 @@
 import pymssql
-from flask import Flask, request, jsonify, session, redirect, url_for
+from flask import Flask, request, jsonify, session
 from flask_cors import CORS
 import hashlib
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, supports_credentials=True) 
 
-app.secret_key = 'your_secret_key'  # Replace with a strong, random secret key
+app.secret_key = 'Equipo1'  # Usa una clave segura en producción
 
 SERVER = 'localhost'
-DATABASE = 'master'
+DATABASE = 'Data'
 USERNAME = 'sa'
-PASSWORD = 'YourPassword123!'
-
+PASSWORD = 'Pioner0s:D'
 
 def get_db_connection():
     try:
@@ -23,18 +22,17 @@ def get_db_connection():
         print(f"Error conectando a BD: {e}")
         return None
 
-
 def verify_password(stored_password_hash, provided_password):
-    hashed_provided_password = hashlib.sha1(
-        provided_password.encode()).hexdigest()
+    hashed_provided_password = hashlib.sha256(provided_password.encode()).digest()
     return stored_password_hash == hashed_provided_password
-
 
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
+
+    print(f'recibido del frontend: {username}, {password}\n')
 
     if not username or not password:
         return jsonify({'error': 'Se requiere usuario y contraseña'}), 400
@@ -43,22 +41,44 @@ def login():
     if conn:
         try:
             cursor = conn.cursor(as_dict=True)
-            cursor.execute(
-                "SELECT username, contrasena FROM usuarios WHERE username = %s", (username,))
+            cursor.execute("""
+                SELECT u.matricula, u.passwordHash, p.rol
+                FROM Usuario u
+                JOIN Profesor p ON u.matricula = p.matricula
+                WHERE u.matricula = %s
+            """, (username,))
+            
             user = cursor.fetchone()
+            print('Usuario desde BD (resultado del JOIN):', user)
 
-            if user and verify_password(user['contrasena'], password):
-                session['username'] = username
-                return jsonify({'mensaje': 'Autenticacion exitosa'}), 200
+            if user:
+                hashed_provided_password = hashlib.sha256(password.encode()).digest()
+
+                print(f"\nHash de la contraseña almacenada: {user['passwordHash']}")
+                print(f"Hash de la contraseña proporcionada (digest): {hashed_provided_password}\n")
+
+                if bytes(user['passwordHash']) == hashed_provided_password:
+                    session['username'] = username
+                    session['rol'] = user['rol']
+                    if user['rol'] == 'Administrador':
+                        return jsonify({'redirect': '/admin'})
+                    elif user['rol'] == 'Director':
+                        return jsonify({'redirect': '/director'})
+                    elif user['rol'] == 'Coordinador':
+                        return jsonify({'redirect': '/coordinador'})
+                    else:
+                        return jsonify({'redirect': '/profesor'})
+                else:
+                    return jsonify({'error': 'Usuario o contraseña incorrectos'}), 401
             else:
-                return jsonify({'error': 'Usuario o password incorrectas'}), 401
+                return jsonify({'error': 'Usuario no encontrado'}), 404
+
         except Exception as e:
-            return jsonify({'error': f'Error en BD {e}'}), 500
+            return jsonify({'error': f'Error en BD: {e}'}), 500
         finally:
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
-
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
