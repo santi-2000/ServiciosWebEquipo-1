@@ -1,0 +1,25 @@
+{
+  "name": "Python + SQL Server",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "forwardPorts": [
+    1433,
+    2025,
+    5000
+  ],
+  "features": {
+    "docker-in-docker": "latest"
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "editor.formatOnSave": true
+      },
+      "extensions": [
+        "ms-python.python",
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.live-server"
+      ]
+    }
+  },
+  "postCreateCommand": "pip install pymssql flask flask-cors requests"
+}

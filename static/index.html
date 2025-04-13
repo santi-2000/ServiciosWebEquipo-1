@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRUD Test</title>
+    <script>
+        const apiUrl = "http://localhost:2025/test";
+
+        async function getAll() {
+            const response = await fetch(apiUrl);
+            const data = await response.json();
+            console.log(data);
+            alert(JSON.stringify(data));
+        }
+
+        async function getOne() {
+            const id = document.getElementById("getOneId").value;
+            const response = await fetch(`${apiUrl}/${id}`);
+            const data = await response.json();
+            alert(JSON.stringify(data));
+        }
+
+        async function create() {
+            const id = document.getElementById("createId").value;
+            const name = document.getElementById("createName").value;
+            const email = document.getElementById("createEmail").value;
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, name, email })
+            });
+            const data = await response.json();
+            alert(JSON.stringify(data));
+        }
+
+        async function update() {
+            const id = document.getElementById("updateId").value;
+            const name = document.getElementById("updateName").value;
+            const email = document.getElementById("updateEmail").value;
+            const response = await fetch(`${apiUrl}/${id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name, email })
+            });
+            const data = await response.json();
+            alert(JSON.stringify(data));
+        }
+
+        async function deleteRecord() {
+            const id = document.getElementById("deleteId").value;
+            const response = await fetch(`${apiUrl}/${id}`, {
+                method: "DELETE"
+            });
+            const data = await response.json();
+            alert(JSON.stringify(data));
+        }
+    </script>
+</head>
+
+<body>
+    <h1>CRUD Test Web</h1>
+
+    <button onclick="getAll()">Obtener Todos</button>
+
+    <h2>Obtener Uno</h2>
+    <input type="number" id="getOneId" placeholder="ID">
+    <button onclick="getOne()">Obtener</button>
+
+    <h2>Crear Registro</h2>
+    <input type="number" id="createId" placeholder="ID">
+    <input type="text" id="createName" placeholder="Nombre">
+    <input type="email" id="createEmail" placeholder="Email">
+    <button onclick="create()">Crear</button>
+
+    <h2>Actualizar Registro</h2>
+    <input type="number" id="updateId" placeholder="ID">
+    <input type="text" id="updateName" placeholder="Nombre">
+    <input type="email" id="updateEmail" placeholder="Email">
+    <button onclick="update()">Actualizar</button>
+
+    <h2>Borrar Registro</h2>
+    <input type="number" id="deleteId" placeholder="ID">
+    <button onclick="deleteRecord()">Borrar</button>
+
+</body>
+
+</html>
