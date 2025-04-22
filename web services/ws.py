@@ -11,7 +11,7 @@ app.secret_key = 'Equipo1'
 SERVER = 'localhost'
 DATABASE = 'Data'
 USERNAME = 'sa'
-PASSWORD = 'Pioner0s:D'
+PASSWORD = 'YourPassword123!'
 
 def get_db_connection():
     try:
@@ -73,6 +73,109 @@ def login():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/profesores', methods=['GET'])
+def get_profesores():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM Profesor")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
 
+@app.route('/profesor/<int:profesor_id>', methods=['GET'])
+def get_profesor_by_id(profesor_id):
+    conn = get_db_connection()
+    if not conn:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
+    try:
+        cursor = conn.cursor(as_dict=True)
+        cursor.execute("""
+            SELECT p.matricula, p.nombre, p.apellidoPaterno, p.apellidoMaterno, p.rol,
+                   d.nombreDepartamento
+            FROM Profesor p
+            JOIN Departamento d ON p.idDepartamento = d.idDepartamento
+            WHERE p.matricula = %s
+        """, (profesor_id,))
+        profesor = cursor.fetchone()
+
+        if profesor:
+            return jsonify(profesor)
+        else:
+            return jsonify({'error': 'Profesor no encontrado'}), 404
+
+    except Exception as e:
+        return jsonify({'error': f'Error en la consulta: {e}'}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/departamentos', methods=['GET'])
+def get_departamentos():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM Departamento")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/alumnos', methods=['GET'])
+def get_alumnos():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM Alumno")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/comentarios', methods=['GET'])
+def get_comentarios():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM Comenta")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/grupos', methods=['GET'])
+def get_grupos():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM Grupo")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/usuarios', methods=['GET'])
+def get_usuarios():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT matricula FROM Usuario")  # Ocultamos el passwordHash por seguridad
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/materias', methods=['GET'])
+def get_materias():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM Materia")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+@app.route('/periodos', methods=['GET'])
+def get_periodos():
+    conn = get_db_connection()
+    cursor = conn.cursor(as_dict=True)
+    cursor.execute("SELECT * FROM PeriodoEscolar")
+    data = cursor.fetchall()
+    conn.close()
+    return jsonify(data)
+
+
+    
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
+
