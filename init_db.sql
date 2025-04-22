@@ -152,9 +152,9 @@ INSERT INTO Materia (clave, nombre, idDepartamento) VALUES
 
 -- Insertar Profesores (asegurando que los departamentos existen)
 INSERT INTO Profesor (matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento) VALUES
-(1111, 'Carlos', 'López', 'Martínez', 'Administrador', 1),
-(2222, 'Ana', 'González', 'Ruiz', 'Coordinador', 2),
-(3333, 'Luis', 'Fernández', 'Soto', 'Director', 3);
+(1, 'Carlos', 'López', 'Martínez', 'Administrador', 1),
+(2, 'Ana', 'González', 'Ruiz', 'Coordinador', 2),
+(3, 'Luis', 'Fernández', 'Soto', 'Director', 3);
 
 -- Insertar Periodos Escolares
 INSERT INTO PeriodoEscolar (fecha) VALUES
