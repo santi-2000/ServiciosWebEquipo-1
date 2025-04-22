@@ -4,9 +4,7 @@ import pymssql
 import hashlib
 
 app = Flask(__name__)
-
-# Permitir CORS desde el dominio específico
-CORS(app, origins=["https://musical-space-xylophone-jjj7j9j7vr6vc59wx-3000.app.github.dev"], supports_credentials=True)
+CORS(app)
 
 app.secret_key = 'Equipo1'
 
