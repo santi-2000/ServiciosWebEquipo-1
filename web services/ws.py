@@ -74,6 +74,38 @@ def login():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
+
+@app.route('/usuario', methods=['GET'])
+def obtener_usuario():
+    if 'username' not in session:
+        return jsonify({'error': 'No has iniciado sesión'}), 401
+
+    username = session['username']
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("""
+                SELECT nombre, apellidoPaterno, apellidoMaterno, rol
+                FROM Profesor
+                WHERE matricula = %s
+            """, (username,))
+            profesor = cursor.fetchone()
+
+            if profesor:
+                nombre_completo = f"{profesor['nombre']} {profesor['apellidoPaterno']} {profesor['apellidoMaterno']}"
+                return jsonify({'nombre': nombre_completo, 'rol': profesor['rol']})
+            else:
+                return jsonify({'error': 'Profesor no encontrado'}), 404
+
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
 @app.route('/profesores', methods=['GET'])
 def get_profesores():
     conn = get_db_connection()
@@ -284,8 +316,7 @@ def get_usuarios():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
-
-    
+  
 @app.route('/materias/nombres', methods=['GET'])
 def get_nombres_materias():
     conn = get_db_connection()
