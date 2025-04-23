@@ -77,11 +77,23 @@ def login():
 @app.route('/profesores', methods=['GET'])
 def get_profesores():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM Profesor")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("""
+                SELECT p.matricula, p.nombre, p.apellidoPaterno, p.apellidoMaterno, p.rol, d.nombreDepartamento
+                FROM Profesor p
+                JOIN Departamento d ON p.idDepartamento = d.idDepartamento
+            """)
+            profesores = cursor.fetchall()
+            return jsonify(profesores), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener profesores: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
 
 @app.route('/profesor/<int:profesor_id>', methods=['GET'])
 def get_profesor_by_id(profesor_id):
@@ -110,72 +122,168 @@ def get_profesor_by_id(profesor_id):
     finally:
         conn.close()
 
+@app.route('/profesores', methods=['POST'])
+def create_profesor():
+    data = request.get_json()
+    matricula = data.get('matricula')
+    nombre = data.get('nombre')
+    apellidoPaterno = data.get('apellidoPaterno')
+    apellidoMaterno = data.get('apellidoMaterno')
+    rol = data.get('rol')
+    idDepartamento = data.get('idDepartamento')
+
+    if not matricula or not nombre or not apellidoPaterno or not apellidoMaterno or not rol or not idDepartamento:
+        return jsonify({'error': 'Todos los campos son obligatorios'}), 400
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO Profesor (matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento))
+            conn.commit()
+            return jsonify({'mensaje': 'Profesor creado exitosamente'}), 201
+        except Exception as e:
+            conn.rollback()
+            return jsonify({'error': f'Error al crear profesor: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/departamentos', methods=['GET'])
 def get_departamentos():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM Departamento")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Departamento")
+            departamentos = cursor.fetchall()
+            return jsonify(departamentos), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener departamentos: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/alumnos', methods=['GET'])
 def get_alumnos():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM Alumno")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Alumno")
+            alumnos = cursor.fetchall()
+            return jsonify(alumnos), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener alumnos: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/comentarios', methods=['GET'])
 def get_comentarios():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM Comenta")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Comenta")
+            comentarios = cursor.fetchall()
+            return jsonify(comentarios), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener comentarios: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+
 
 @app.route('/grupos', methods=['GET'])
 def get_grupos():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM Grupo")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Grupo")
+            grupos = cursor.fetchall()
+            return jsonify(grupos), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener grupos: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/usuarios', methods=['GET'])
 def get_usuarios():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT matricula FROM Usuario")  # Ocultamos el passwordHash por seguridad
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT matricula FROM Usuario")
+            usuarios = cursor.fetchall()
+            return jsonify(usuarios), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener usuarios: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/materias', methods=['GET'])
 def get_materias():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM Materia")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Materia")
+            materias = cursor.fetchall()
+            return jsonify(materias), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener materias: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/materias', methods=['GET'])
+def get_materias():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Materia")
+            materias = cursor.fetchall()
+            return jsonify(materias), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener materias: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
 
 @app.route('/periodos', methods=['GET'])
 def get_periodos():
     conn = get_db_connection()
-    cursor = conn.cursor(as_dict=True)
-    cursor.execute("SELECT * FROM PeriodoEscolar")
-    data = cursor.fetchall()
-    conn.close()
-    return jsonify(data)
-
-
-    
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM PeriodoEscolar")
+            periodos = cursor.fetchall()
+            return jsonify(periodos), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener periodos: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+     
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
 
