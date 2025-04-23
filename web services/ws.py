@@ -168,6 +168,22 @@ def get_departamentos():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/Departamento/nombres', methods=['GET'])
+def get_nombres_grupos():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT nombreDepartamento FROM Departamento")  # seleccionamos solo la columna grupo
+            Departamento = cursor.fetchall()
+            return jsonify(Departamento)
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/alumnos', methods=['GET'])
 def get_alumnos():
@@ -185,6 +201,7 @@ def get_alumnos():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
+
 @app.route('/comentarios', methods=['GET'])
 def get_comentarios():
     conn = get_db_connection()
@@ -201,23 +218,56 @@ def get_comentarios():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
+@app.route('/comentarios/<int:idPregunta>/<string:matricula>/<int:CRN>', methods=['PUT'])
+def update_comentario(idPregunta, matricula, CRN):
+    data = request.get_json()
+    nuevo_comentario = data.get('comentario')
+    nueva_fecha = data.get('fecha')  # Esto lo puedes ignorar si no usas fechas
+
+    if not nuevo_comentario:
+        return jsonify({'error': 'El campo comentario es obligatorio'}), 400
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Comenta
+                SET comentario = %s
+                WHERE idPregunta = %s AND matricula = %s AND CRN = %s
+            """, (nuevo_comentario, idPregunta, matricula, CRN))
+
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Comentario no encontrado'}), 404
+
+            conn.commit()
+            return jsonify({'mensaje': 'Comentario actualizado exitosamente'}), 200
+        except Exception as e:
+            conn.rollback()
+            return jsonify({'error': f'Error al actualizar comentario: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 
-@app.route('/grupos', methods=['GET'])
-def get_grupos():
+
+@app.route('/materias', methods=['GET'])
+def get_materias():
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor(as_dict=True)
             cursor.execute("SELECT * FROM Grupo")
-            grupos = cursor.fetchall()
-            return jsonify(grupos), 200
+            materias = cursor.fetchall()
+            return jsonify(materias), 200
         except Exception as e:
-            return jsonify({'error': f'Error al obtener grupos: {e}'}), 500
+            return jsonify({'error': f'Error al obtener materias: {e}'}), 500
         finally:
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
 
 @app.route('/usuarios', methods=['GET'])
 def get_usuarios():
@@ -235,38 +285,23 @@ def get_usuarios():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
-@app.route('/materias', methods=['GET'])
-def get_materias():
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor(as_dict=True)
-            cursor.execute("SELECT * FROM Materia")
-            materias = cursor.fetchall()
-            return jsonify(materias), 200
-        except Exception as e:
-            return jsonify({'error': f'Error al obtener materias: {e}'}), 500
-        finally:
-            conn.close()
-    else:
-        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
-@app.route('/materias', methods=['GET'])
-def get_materias():
+@app.route('/materias/nombres', methods=['GET'])
+def get_nombres_materias():
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor(as_dict=True)
-            cursor.execute("SELECT * FROM Materia")
+            cursor.execute("SELECT nombre FROM Materia")
             materias = cursor.fetchall()
-            return jsonify(materias), 200
+            crns = [g['nombre'] for g in materias]
+            return jsonify(crns), 200
         except Exception as e:
-            return jsonify({'error': f'Error al obtener materias: {e}'}), 500
+            return jsonify({'error': f'Error en BD: {e}'}), 500
         finally:
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
-
 
 @app.route('/periodos', methods=['GET'])
 def get_periodos():
@@ -283,7 +318,8 @@ def get_periodos():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
-     
+    
+    
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
 
