@@ -95,7 +95,7 @@ def obtener_usuario():
 
             if profesor:
                 nombre_completo = f"{profesor['nombre']} {profesor['apellidoPaterno']} {profesor['apellidoMaterno']}"
-                return jsonify({'nombre': nombre_completo, 'rol': profesor['rol']})
+                return jsonify({'nombre': nombre_completo})
             else:
                 return jsonify({'error': 'Profesor no encontrado'}), 404
 
@@ -254,7 +254,7 @@ def get_comentarios():
 def update_comentario(idPregunta, matricula, CRN):
     data = request.get_json()
     nuevo_comentario = data.get('comentario')
-    nueva_fecha = data.get('fecha')  # Esto lo puedes ignorar si no usas fechas
+    nueva_fecha = data.get('fecha') 
 
     if not nuevo_comentario:
         return jsonify({'error': 'El campo comentario es obligatorio'}), 400
