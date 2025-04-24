@@ -95,7 +95,7 @@ def obtener_usuario():
 
             if profesor:
                 nombre_completo = f"{profesor['nombre']} {profesor['apellidoPaterno']} {profesor['apellidoMaterno']}"
-                return jsonify({'nombre': nombre_completo})
+                return nombre_completo
             else:
                 return jsonify({'error': 'Profesor no encontrado'}), 404
 
