@@ -107,6 +107,29 @@ def obtener_usuario():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
+@app.route('/profesores/rol', methods=['GET'])
+def get_roles_profesor():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("""
+                SELECT DISTINCT rol
+                FROM Profesor
+            """)
+            roles = cursor.fetchall()
+
+            # Extrae solo el campo 'rol' de cada fila
+            roles_list = [r['rol'] for r in roles]
+
+            return jsonify(roles_list), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener roles: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
 @app.route('/profesores/nombres', methods=['GET'])
 def get_nombres_profesores():
     conn = get_db_connection()
