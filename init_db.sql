@@ -141,9 +141,14 @@ INSERT INTO Materia (clave, nombre, idDepartamento) VALUES
 (303, 'Mecánica', 3);
 
 INSERT INTO Profesor (matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento) VALUES
-('A001', 'Carlos', 'López', 'Martínez', 'Administrador', 1),
-('A002', 'Ana', 'González', 'Ruiz', 'Coordinador', 2),
-('A003', 'Luis', 'Fernández', 'Soto', 'Director', 3);
+('P001', 'Carlos', 'López', 'Martínez', 'Administrador', 1),
+('P002', 'Ana', 'González', 'Ruiz', 'Coordinador', 2),
+('P003', 'Luis', 'Fernández', 'Soto', 'Director', 3);
+
+INSERT INTO Usuario (matricula, passwordHash) VALUES
+('P001', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Renata'))),
+('P002', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Renlo'))),
+('P003', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Dania')));
 
 INSERT INTO PeriodoEscolar (fecha) VALUES
 ('2024-01-01'),
@@ -164,9 +169,9 @@ INSERT INTO Pregunta (pregunta) VALUES
 ('¿Cómo calificarías al profesor?');
 
 INSERT INTO ProfesorGrupo (CRN, matricula) VALUES
-(1001, 'A001'),
-(1002, 'A002'),
-(1003, 'A003');
+(1001, 'P001'),
+(1002, 'P002'),
+(1003, 'P003');
 
 INSERT INTO Responde (matricula, idPregunta, CRN, respuesta) VALUES
 ('A001', 1, 1001, 'Sí'),
@@ -186,8 +191,3 @@ INSERT INTO GrupoClasifClase (CRN, clasifClase) VALUES
 (1001, 'Teoría'),
 (1002, 'Laboratorio'),
 (1003, 'Teoría');
-
-INSERT INTO Usuario (matricula, passwordHash) VALUES
-('A001', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Renata'))),
-('A002', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Renlo'))),
-('A003', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Dania')));

@@ -4,6 +4,8 @@ import pymssql
 import hashlib
 import pandas as pd
 import hashlib
+from unidecode import unidecode
+
 
 app = Flask(__name__)
 CORS(app)
@@ -27,6 +29,9 @@ def get_db_connection():
 def verify_password(stored_password_hash, provided_password):
     hashed_provided_password = hashlib.sha256(provided_password.encode()).digest()
     return stored_password_hash == hashed_provided_password
+
+def normalizar(texto):
+    return unidecode(texto.strip().lower())
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -275,6 +280,39 @@ def get_nombres_departamentos():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
+@app.route('/calificacion/maxima', methods=['GET'])
+def obtener_calificacion_maxima():
+    if 'username' not in session:
+        return jsonify({'error': 'No has iniciado sesión'}), 401
+
+    username = session['username']  # matrícula del profesor
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("""
+                SELECT MAX(CAST(r.respuesta AS FLOAT)) AS calificacion_maxima
+                FROM Responde r
+                JOIN ProfesorGrupo pg ON r.CRN = pg.CRN
+                WHERE pg.matricula = %s
+                  AND ISNUMERIC(r.respuesta) = 1
+                  AND TRY_CAST(r.respuesta AS FLOAT) BETWEEN 1 AND 10
+            """, (username,))
+            resultado = cursor.fetchone()
+
+            if resultado and resultado['calificacion_maxima'] is not None:
+                return jsonify({'calificacion_maxima': round(resultado['calificacion_maxima'], 2)})
+            else:
+                return jsonify({'error': 'No se encontraron calificaciones válidas'}), 404
+
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
 @app.route('/promedio_pregunta/<int:idPregunta>', methods=['GET'])
 def promedio_pregunta(idPregunta):
     conn = get_db_connection()
@@ -342,23 +380,26 @@ def obtener_calificacion_minima():
     if 'username' not in session:
         return jsonify({'error': 'No has iniciado sesión'}), 401
 
-    username = session['username']
+    username = session['username']  # Esto es la matrícula del profesor
 
     conn = get_db_connection()
     if conn:
         try:
             cursor = conn.cursor(as_dict=True)
             cursor.execute("""
-                SELECT MIN(calificacion) AS calificacion_minima
-                FROM Calificacion
-                WHERE matriculaProfesor = %s
+                SELECT MIN(CAST(r.respuesta AS FLOAT)) AS calificacion_minima
+                FROM Responde r
+                JOIN ProfesorGrupo pg ON r.CRN = pg.CRN
+                WHERE pg.matricula = %s
+                  AND ISNUMERIC(r.respuesta) = 1
+                  AND TRY_CAST(r.respuesta AS FLOAT) BETWEEN 1 AND 10
             """, (username,))
             resultado = cursor.fetchone()
 
             if resultado and resultado['calificacion_minima'] is not None:
-                return jsonify({'calificacion_minima': resultado['calificacion_minima']})
+                return jsonify({'calificacion_minima': round(resultado['calificacion_minima'], 2)})
             else:
-                return jsonify({'error': 'No se encontraron calificaciones'}), 404
+                return jsonify({'error': 'No se encontraron calificaciones válidas'}), 404
 
         except Exception as e:
             return jsonify({'error': f'Error en BD: {e}'}), 500
@@ -366,6 +407,7 @@ def obtener_calificacion_minima():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
 
 @app.route('/promedio_general_profesor/<string:matricula>', methods=['GET'])
 def promedio_general_profesor(matricula):
@@ -373,20 +415,38 @@ def promedio_general_profesor(matricula):
     if conn:
         try:
             cursor = conn.cursor()
+
+            # Solo respuestas numéricas válidas (1 al 10)
             cursor.execute("""
                 SELECT AVG(CAST(r.respuesta AS FLOAT))
                 FROM Responde r
                 JOIN ProfesorGrupo pg ON r.CRN = pg.CRN
                 WHERE pg.matricula = %s
+                  AND ISNUMERIC(r.respuesta) = 1
+                  AND TRY_CAST(r.respuesta AS FLOAT) BETWEEN 1 AND 10
             """, (matricula,))
+
             promedio = cursor.fetchone()[0]
-            return jsonify({'matricula': matricula, 'promedio_general': promedio})
+
+            if promedio is None:
+                return jsonify({
+                    'matricula': matricula,
+                    'promedio_general': None,
+                    'mensaje': 'Sin respuestas válidas (del 1 al 10)'
+                }), 200
+
+            return jsonify({
+                'matricula': matricula,
+                'promedio_general': round(promedio, 2)
+            }), 200
+
         except Exception as e:
             return jsonify({'error': f'Error en BD: {e}'}), 500
         finally:
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
 
 @app.route('/Permisos', methods=['GET'])
 def get_nombres_permisos():
@@ -601,19 +661,14 @@ def subir_encuesta():
 
     try:
         df = pd.read_excel(file)
-        df.columns = [str(col) for col in df.columns]
     except Exception as e:
         return f"Error al leer el archivo Excel: {str(e)}", 400
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Identificar columnas que son preguntas (ignorar profesor, clase, etc.)
-    columnas_fijas = ['Matricula', 'Grupo', 'Comentarios', 'Profesor', 'Clase']
-    preguntas = [col for col in df.columns if col not in columnas_fijas]
+    preguntas = df.columns[5:]
     pregunta_ids = []
-
-    # Insertar preguntas si no existen
     for pregunta in preguntas:
         cursor.execute("SELECT idPregunta FROM Pregunta WHERE pregunta = %s", (pregunta,))
         row = cursor.fetchone()
@@ -631,40 +686,46 @@ def subir_encuesta():
         profesor_nombre = row['Profesor']
         clase = row['Clase']
 
-        # Procesar nombre del profesor
-        partes = profesor_nombre.split(',')
-        apellido_paterno = partes[0].strip()
-        nombre_completo = partes[1].strip()
+        partes = profesor_nombre.strip().split(',')
+        if len(partes) != 2:
+            continue
+
+        apellido_paterno = normalizar(partes[0])
+        nombre_completo = normalizar(partes[1])
         nombre_parts = nombre_completo.split()
-        nombre_prof = nombre_parts[0]
+
+        nombre_prof = nombre_parts[0] if nombre_parts else ''
         apellido_materno = nombre_parts[-1] if len(nombre_parts) > 1 else ''
 
-        cursor.execute("""
-            SELECT matricula FROM Profesor
-            WHERE nombre = %s AND apellidoPaterno = %s AND apellidoMaterno = %s
-        """, (nombre_prof, apellido_paterno, apellido_materno))
-        row_prof = cursor.fetchone()
+        cursor.execute("SELECT matricula, nombre, apellidoPaterno, apellidoMaterno FROM Profesor")
+        profesores = cursor.fetchall()
 
-        if row_prof:
-            matricula_prof = row_prof[0]
-        else:
-            hash_input = (profesor_nombre).encode()
-            matricula_prof = "P" + hashlib.sha256(hash_input).hexdigest()[:6]
+        matricula_prof = None
+        for prof in profesores:
+            if (
+                normalizar(prof[1]) == nombre_prof and
+                normalizar(prof[2]) == apellido_paterno and
+                normalizar(prof[3]) == apellido_materno
+            ):
+                matricula_prof = prof[0]
+                break
+
+        if not matricula_prof:
+            matricula_prof = f"P{hash(profesor_nombre) % 10000}"
             cursor.execute("""
                 INSERT INTO Profesor(matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (matricula_prof, nombre_prof, apellido_paterno, apellido_materno, 'Profesor', 1))
 
-        # Verificar o crear materia
         cursor.execute("SELECT clave FROM Materia WHERE nombre = %s", (clase,))
         row_mat = cursor.fetchone()
         if row_mat:
             clave = row_mat[0]
         else:
             clave = hash(clase) % 10000
-            cursor.execute("INSERT INTO Materia(clave, nombre, idDepartamento) VALUES (%s, %s, %s)", (clave, clase, 1))
+            cursor.execute("INSERT INTO Materia(clave, nombre, idDepartamento) VALUES (%s, %s, %s)",
+                           (clave, clase, 1))
 
-        # Verificar o crear grupo
         cursor.execute("SELECT CRN FROM Grupo WHERE clave = %s", (clave,))
         row_grp = cursor.fetchone()
         if row_grp:
@@ -673,31 +734,23 @@ def subir_encuesta():
             crn = hash(grupo_str + clase) % 10000
             cursor.execute("INSERT INTO Grupo(CRN, idPeriodo, clave) VALUES (%s, %s, %s)", (crn, 1, clave))
 
-        # Relacionar grupo con profesor
         cursor.execute("SELECT * FROM ProfesorGrupo WHERE CRN = %s AND matricula = %s", (crn, matricula_prof))
         if not cursor.fetchone():
             cursor.execute("INSERT INTO ProfesorGrupo(CRN, matricula) VALUES (%s, %s)", (crn, matricula_prof))
 
-        # Verificar o crear alumno
         cursor.execute("SELECT * FROM Alumno WHERE matricula = %s", (matricula,))
         if not cursor.fetchone():
-            cursor.execute("""
-                INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno)
-                VALUES (%s, %s, %s, %s)
-            """, (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
+            cursor.execute("INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno) VALUES (%s, %s, %s, %s)",
+                           (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
 
-        # Guardar respuestas
-        for pregunta_col, pid in zip(preguntas, pregunta_ids):
-            respuesta = row[pregunta_col]
-
+        for i, pid in enumerate(pregunta_ids):
+            respuesta = row[i + 5]
             cursor.execute("""
                 SELECT 1 FROM Responde WHERE matricula = %s AND idPregunta = %s AND CRN = %s
             """, (matricula, pid, crn))
-
             if cursor.fetchone():
                 cursor.execute("""
-                    UPDATE Responde
-                    SET respuesta = %s
+                    UPDATE Responde SET respuesta = %s
                     WHERE matricula = %s AND idPregunta = %s AND CRN = %s
                 """, (str(respuesta), matricula, pid, crn))
             else:
@@ -706,11 +759,13 @@ def subir_encuesta():
                     VALUES (%s, %s, %s, %s)
                 """, (matricula, pid, crn, str(respuesta)))
 
-        # Guardar comentario
-        cursor.execute("""
-            INSERT INTO Comenta(matricula, CRN, comentario)
-            VALUES (%s, %s, %s)
-        """, (matricula, crn, comentario))
+        cursor.execute("SELECT 1 FROM Comenta WHERE matricula = %s AND CRN = %s", (matricula, crn))
+        if cursor.fetchone():
+            cursor.execute("UPDATE Comenta SET comentario = %s WHERE matricula = %s AND CRN = %s",
+                           (comentario, matricula, crn))
+        else:
+            cursor.execute("INSERT INTO Comenta(matricula, CRN, comentario) VALUES (%s, %s, %s)",
+                           (matricula, crn, comentario))
 
     conn.commit()
     cursor.close()
