@@ -498,39 +498,6 @@ def get_comentarios():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
-@app.route('/comentarios/<int:idPregunta>/<string:matricula>/<int:CRN>', methods=['PUT'])
-def update_comentario(idPregunta, matricula, CRN):
-    data = request.get_json()
-    nuevo_comentario = data.get('comentario')
-    nueva_fecha = data.get('fecha') 
-
-    if not nuevo_comentario:
-        return jsonify({'error': 'El campo comentario es obligatorio'}), 400
-
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            cursor.execute("""
-                UPDATE Comenta
-                SET comentario = %s
-                WHERE idPregunta = %s AND matricula = %s AND CRN = %s
-            """, (nuevo_comentario, idPregunta, matricula, CRN))
-
-            if cursor.rowcount == 0:
-                return jsonify({'error': 'Comentario no encontrado'}), 404
-
-            conn.commit()
-            return jsonify({'mensaje': 'Comentario actualizado exitosamente'}), 200
-        except Exception as e:
-            conn.rollback()
-            return jsonify({'error': f'Error al actualizar comentario: {e}'}), 500
-        finally:
-            conn.close()
-    else:
-        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
-
-
 
 @app.route('/materias', methods=['GET'])
 def get_materias():
@@ -648,6 +615,39 @@ def get_grupo():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/total_preguntas', methods=['GET'])
+def total_preguntas():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Pregunta")
+            total = cursor.fetchone()[0]
+            return jsonify({'total_preguntas': total})
+        except Exception as e:
+            return jsonify({'error': f'Error al contar preguntas: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
+@app.route('/total_respuestas', methods=['GET'])
+def total_respuestas():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM Responde")
+            total = cursor.fetchone()[0]
+            return jsonify({'total_respuestas': total})
+        except Exception as e:
+            return jsonify({'error': f'Error al contar respuestas: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
     
 
 @app.route('/subir_encuesta', methods=['POST'])
