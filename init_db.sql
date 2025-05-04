@@ -73,7 +73,7 @@ CREATE TABLE Alumno (
 
 CREATE TABLE Pregunta (
   idPregunta INT NOT NULL IDENTITY(1,1),
-  pregunta VARCHAR(60) NOT NULL,
+  pregunta VARCHAR(255) NOT NULL,
   PRIMARY KEY (idPregunta)
 );
 

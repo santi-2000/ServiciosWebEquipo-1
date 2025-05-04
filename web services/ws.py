@@ -4,6 +4,7 @@ import pymssql
 import hashlib
 import pandas as pd
 
+
 app = Flask(__name__)
 CORS(app)
 
@@ -446,135 +447,121 @@ def get_grupo():
 @app.route('/subir_encuesta', methods=['POST'])
 def subir_encuesta():
     if 'file' not in request.files:
-        return jsonify({'error': 'No se encontró el archivo'}), 400
-    
+        return "No se encontró el archivo", 400
+
     file = request.files['file']
-
     if file.filename == '':
-        return jsonify({'error': 'No se seleccionó un archivo'}), 400
+        return "El nombre del archivo está vacío", 400
 
-    if file and file.filename.endswith('.xlsx'):
-        # Leer el archivo Excel
-        df = pd.read_excel(file, engine='openpyxl')
-        expected_columns = ['Matricula', 'Grupo', 'Comentarios', 'Profesor', 'Clase']
+    try:
+        # Leer el archivo Excel en un DataFrame de pandas
+        df = pd.read_excel(file)
+    except Exception as e:
+        return f"Error al leer el archivo Excel: {str(e)}", 400
 
-        if not all(col in df.columns for col in expected_columns):
-            return jsonify({'error': 'El archivo no contiene todas las columnas requeridas'}), 400
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-        data_json = df.to_dict(orient='records')
+    # Obtener preguntas y agregarlas si no existen
+    preguntas = df.columns[5:]  # desde la columna F en adelante
+    pregunta_ids = []
 
-        conexion = get_db_connection()
-        if conexion is None:
-            return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    for pregunta in preguntas:
+        cursor.execute("SELECT idPregunta FROM Pregunta WHERE pregunta = %s", (pregunta,))
+        row = cursor.fetchone()
+        if row:
+            pregunta_ids.append(row[0])
+        else:
+            cursor.execute("INSERT INTO Pregunta(pregunta) VALUES (%s)", (pregunta,))
+            cursor.execute("SELECT SCOPE_IDENTITY()")
+            pregunta_ids.append(cursor.fetchone()[0])
 
-        cursor = conexion.cursor()
+    for _, row in df.iterrows():
+        matricula = row['Matricula']
+        grupo_str = row['Grupo']
+        comentario = row['Comentarios']
+        profesor_nombre = row['Profesor']
+        clase = row['Clase']
 
-        try:
-            for row in data_json:
-                matricula = str(row['Matricula']).strip()
-                grupo_nombre = str(row['Grupo']).strip()
-                comentario = row['Comentarios']
-                profesor_nombre = row['Profesor']
-                clase_nombre = row['Clase']
-                respuestas = {k: v for k, v in row.items() if k not in expected_columns}
+        # Dividir el nombre del profesor
+        partes = profesor_nombre.split(',')
+        apellido = partes[0].strip()
+        nombre = partes[1].strip()
+        nombre_parts = nombre.split()
+        nombre_prof = nombre_parts[0]
+        apellido_materno = nombre_parts[-1] if len(nombre_parts) > 1 else ''
+        apellido_paterno = apellido
 
-                cursor.execute("SELECT matricula FROM Alumno WHERE matricula = %s", (matricula,))
-                if not cursor.fetchone():
-                    cursor.execute("""
-                        INSERT INTO Alumno (matricula, nombre, apellidoPaterno, apellidoMaterno)
-                        VALUES (%s, 'Pendiente', 'Pendiente', 'Pendiente')
-                    """, (matricula,))
+        # Crear profesor si no existe
+        cursor.execute("""
+            SELECT matricula FROM Profesor
+            WHERE nombre = %s AND apellidoPaterno = %s AND apellidoMaterno = %s
+        """, (nombre_prof, apellido_paterno, apellido_materno))
+        row_prof = cursor.fetchone()
 
-                cursor.execute("SELECT clave FROM Materia WHERE nombre = %s", (clase_nombre,))
-                materia = cursor.fetchone()
-                if materia:
-                    clave_materia = materia[0]
-                else:
-                    cursor.execute("""
-                        INSERT INTO Materia (clave, nombre, idDepartamento)
-                        VALUES ((SELECT ISNULL(MAX(clave), 100) + 1 FROM Materia), %s, 1)
-                    """, (clase_nombre,))
-                    conexion.commit()
-                    cursor.execute("SELECT clave FROM Materia WHERE nombre = %s", (clase_nombre,))
-                    clave_materia = cursor.fetchone()[0]
+        if row_prof:
+            matricula_prof = row_prof[0]
+        else:
+            matricula_prof = f"P{hash(profesor_nombre) % 10000}"
+            cursor.execute("""
+                INSERT INTO Profesor(matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (matricula_prof, nombre_prof, apellido_paterno, apellido_materno, 'Profesor', 1))
 
-                cursor.execute("SELECT CRN FROM Grupo WHERE grupo = %s AND clave = %s", (grupo_nombre, clave_materia))
-                grupo = cursor.fetchone()
-                if grupo:
-                    crn = grupo[0]
-                else:
-                    cursor.execute("""
-                        INSERT INTO Grupo (idPeriodo, clave, grupo)
-                        VALUES (1, %s, %s)
-                    """, (clave_materia, grupo_nombre))
-                    conexion.commit()
-                    cursor.execute("SELECT CRN FROM Grupo WHERE grupo = %s AND clave = %s", (grupo_nombre, clave_materia))
-                    crn = cursor.fetchone()[0]
+        # Crear materia si no existe
+        cursor.execute("SELECT clave FROM Materia WHERE nombre = %s", (clase,))
+        row_mat = cursor.fetchone()
 
-                if "," in profesor_nombre:
-                    apellido_paterno, nombre_profesor = map(str.strip, profesor_nombre.split(",", 1))
-                else:
-                    return jsonify({'error': f'Formato incorrecto para el nombre del profesor: {profesor_nombre}'}), 400
+        if row_mat:
+            clave = row_mat[0]
+        else:
+            clave = hash(clase) % 10000
+            cursor.execute("INSERT INTO Materia(clave, nombre, idDepartamento) VALUES (%s, %s, %s)",
+                           (clave, clase, 1))
 
+        # Crear grupo si no existe
+        cursor.execute("""
+            SELECT CRN FROM Grupo
+            WHERE clave = %s
+        """, (clave,))
+        row_grp = cursor.fetchone()
+
+        if row_grp:
+            crn = row_grp[0]
+        else:
+            crn = hash(grupo_str + clase) % 10000
+            cursor.execute("INSERT INTO Grupo(CRN, idPeriodo, clave) VALUES (%s, %s, %s)", (crn, 1, clave))
+
+        # Relacionar grupo con profesor
+        cursor.execute("SELECT * FROM ProfesorGrupo WHERE CRN = %s AND matricula = %s", (crn, matricula_prof))
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO ProfesorGrupo(CRN, matricula) VALUES (%s, %s)", (crn, matricula_prof))
+
+        # Crear alumno si no existe
+        cursor.execute("SELECT * FROM Alumno WHERE matricula = %s", (matricula,))
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno) VALUES (%s, %s, %s, %s)",
+                           (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
+
+        # Insertar respuestas y comentario
+        for i, pid in enumerate(pregunta_ids):
+            respuesta = row[i + 5]
+            cursor.execute("""
+                INSERT INTO Responde(matricula, idPregunta, CRN, respuesta)
+                VALUES (%s, %s, %s, %s)
+            """, (matricula, pid, crn, str(respuesta)))
+
+            # Comentarios se asocian a la primera pregunta
+            if i == 0 and pd.notna(comentario):
                 cursor.execute("""
-                    SELECT matricula FROM Profesor
-                    WHERE nombre = %s AND apellidoPaterno = %s
-                """, (nombre_profesor, apellido_paterno))
-                profesor = cursor.fetchone()
-                if profesor:
-                    matricula_profesor = profesor[0]
-                else:
-                    nueva_matricula_profesor = f"P{clave_materia}{grupo_nombre}"
-                    cursor.execute("""
-                        INSERT INTO Profesor (matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento)
-                        VALUES (%s, %s, %s, 'Pendiente', 'Profesor', 1)
-                    """, (nueva_matricula_profesor, nombre_profesor, apellido_paterno))
-                    conexion.commit()
-                    matricula_profesor = nueva_matricula_profesor
+                    INSERT INTO Comenta(idPregunta, matricula, CRN, comentario)
+                    VALUES (%s, %s, %s, %s)
+                """, (pid, matricula, crn, comentario))
 
-                cursor.execute("""
-                    SELECT 1 FROM ProfesorGrupo WHERE CRN = %s AND matricula = %s
-                """, (crn, matricula_profesor))
-                if not cursor.fetchone():
-                    cursor.execute("INSERT INTO ProfesorGrupo (CRN, matricula) VALUES (%s, %s)", (crn, matricula_profesor))
-
-                if comentario and not pd.isna(comentario):
-                    cursor.execute("""
-                        IF NOT EXISTS (
-                            SELECT 1 FROM Comenta
-                            WHERE idPregunta = 1 AND matricula = %s AND CRN = %s
-                        )
-                        BEGIN
-                            INSERT INTO Comenta (idPregunta, matricula, CRN, comentario)
-                            VALUES (1, %s, %s, %s)
-                        END
-                    """, (matricula, crn, matricula, crn, comentario))
-
-                for idx, (pregunta, valor) in enumerate(respuestas.items(), start=1):
-                    if not pd.isna(valor):
-                        cursor.execute("""
-                            IF NOT EXISTS (
-                                SELECT 1 FROM Responde
-                                WHERE matricula = %s AND idPregunta = %s AND CRN = %s
-                            )
-                            BEGIN
-                                INSERT INTO Responde (matricula, idPregunta, CRN, respuesta)
-                                VALUES (%s, %s, %s, %s)
-                            END
-                        """, (matricula, idx, crn, matricula, idx, crn, str(valor)))
-
-            conexion.commit()
-            return jsonify({'mensaje': 'Archivo procesado con éxito y registros creados si no existían'}), 200
-
-        except Exception as e:
-            conexion.rollback()
-            return jsonify({'error': f'Ocurrió un error al procesar el archivo: {str(e)}'}), 500
-
-        finally:
-            cursor.close()
-            conexion.close()
-
-    return jsonify({'error': 'Formato de archivo no soportado. Por favor sube un archivo .xlsx'}), 400
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return jsonify({"message": "Datos cargados correctamente"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
