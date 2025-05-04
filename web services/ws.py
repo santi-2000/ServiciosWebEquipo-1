@@ -543,20 +543,34 @@ def subir_encuesta():
             cursor.execute("INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno) VALUES (%s, %s, %s, %s)",
                            (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
 
-        # Insertar respuestas y comentario
+        # Insertar o actualizar respuestas y comentario
         for i, pid in enumerate(pregunta_ids):
             respuesta = row[i + 5]
-            cursor.execute("""
-                INSERT INTO Responde(matricula, idPregunta, CRN, respuesta)
-                VALUES (%s, %s, %s, %s)
-            """, (matricula, pid, crn, str(respuesta)))
 
-            # Comentarios se asocian a la primera pregunta
-            if i == 0 and pd.notna(comentario):
+            # Verificar si ya existe una respuesta para la combinación (matricula, idPregunta, CRN)
+            cursor.execute("""
+                SELECT 1 FROM Responde WHERE matricula = %s AND idPregunta = %s AND CRN = %s
+            """, (matricula, pid, crn))
+            if cursor.fetchone():
+                # Si existe, actualizar la respuesta
                 cursor.execute("""
-                    INSERT INTO Comenta(idPregunta, matricula, CRN, comentario)
+                    UPDATE Responde
+                    SET respuesta = %s
+                    WHERE matricula = %s AND idPregunta = %s AND CRN = %s
+                """, (str(respuesta), matricula, pid, crn))
+            else:
+                # Si no existe, insertar la respuesta
+                cursor.execute("""
+                    INSERT INTO Responde(matricula, idPregunta, CRN, respuesta)
                     VALUES (%s, %s, %s, %s)
-                """, (pid, matricula, crn, comentario))
+                """, (matricula, pid, crn, str(respuesta)))
+
+                # Comentarios se asocian a la primera pregunta
+                if i == 0 and pd.notna(comentario):
+                    cursor.execute("""
+                        INSERT INTO Comenta(idPregunta, matricula, CRN, comentario)
+                        VALUES (%s, %s, %s, %s)
+                    """, (pid, matricula, crn, comentario))
 
     conn.commit()
     cursor.close()
