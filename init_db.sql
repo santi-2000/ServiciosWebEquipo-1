@@ -143,12 +143,14 @@ INSERT INTO Materia (clave, nombre, idDepartamento) VALUES
 INSERT INTO Profesor (matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento) VALUES
 ('P001', 'Carlos', 'López', 'Martínez', 'Administrador', 1),
 ('P002', 'Ana', 'González', 'Ruiz', 'Coordinador', 2),
-('P003', 'Luis', 'Fernández', 'Soto', 'Director', 3);
+('P003', 'Luis', 'Fernández', 'Soto', 'Director', 3),
+('P004', 'Santiago', 'Estrada', 'Orozco', 'Profesor', 1);
 
 INSERT INTO Usuario (matricula, passwordHash) VALUES
 ('P001', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Renata'))),
 ('P002', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Renlo'))),
-('P003', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Dania')));
+('P003', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Dania'))),
+('P004', HASHBYTES('SHA2_256', CONVERT(VARCHAR, 'Santi')));
 
 INSERT INTO PeriodoEscolar (fecha) VALUES
 ('2024-01-01'),
