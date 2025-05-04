@@ -98,12 +98,11 @@ CREATE TABLE Responde (
 );
 
 CREATE TABLE Comenta (
-  idPregunta INT NOT NULL,
+  idComentario INT NOT NULL IDENTITY(1,1),
   matricula VARCHAR(7) NOT NULL,
   CRN INT NOT NULL,
   comentario VARCHAR(MAX) NULL,
-  PRIMARY KEY (idPregunta, matricula, CRN),
-  FOREIGN KEY (idPregunta) REFERENCES Pregunta(idPregunta),
+  PRIMARY KEY (idComentario),
   FOREIGN KEY (matricula) REFERENCES Alumno(matricula),
   FOREIGN KEY (CRN) REFERENCES Grupo(CRN)
 );
@@ -173,9 +172,9 @@ INSERT INTO Responde (matricula, idPregunta, CRN, respuesta) VALUES
 ('A001', 1, 1001, 'Sí'),
 ('A002', 2, 1002, 'Regular');
 
-INSERT INTO Comenta (idPregunta, matricula, CRN, comentario) VALUES
-(1, 'A001', 1001, 'Me gusta la materia'),
-(2, 'A002', 1002, 'El profesor explica bien');
+INSERT INTO Comenta (matricula, CRN, comentario) VALUES
+('A001', 1001, 'Me gusta la materia'),
+('A002', 1002, 'El profesor explica bien');
 
 INSERT INTO Permisos (rol) VALUES
 ('Administrador'),

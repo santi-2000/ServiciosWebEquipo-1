@@ -3,7 +3,7 @@ from flask_cors import CORS
 import pymssql
 import hashlib
 import pandas as pd
-
+import hashlib
 
 app = Flask(__name__)
 CORS(app)
@@ -274,6 +274,119 @@ def get_nombres_departamentos():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/promedio_pregunta/<int:idPregunta>', methods=['GET'])
+def promedio_pregunta(idPregunta):
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT AVG(CAST(respuesta AS FLOAT)) 
+                FROM Responde 
+                WHERE idPregunta = %s
+            """, (idPregunta,))
+            promedio = cursor.fetchone()[0]
+            return jsonify({'idPregunta': idPregunta, 'promedio': promedio})
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/max_pregunta/<int:idPregunta>', methods=['GET'])
+def max_pregunta(idPregunta):
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT MAX(CAST(respuesta AS FLOAT)) 
+                FROM Responde 
+                WHERE idPregunta = %s
+            """, (idPregunta,))
+            maxima = cursor.fetchone()[0]
+            return jsonify({'idPregunta': idPregunta, 'maxima_calificacion': maxima})
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/promedio_profesor_grupo/<string:matricula>/<int:CRN>', methods=['GET'])
+def promedio_profesor_grupo(matricula, CRN):
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT AVG(CAST(r.respuesta AS FLOAT))
+                FROM Responde r
+                JOIN ProfesorGrupo pg ON r.CRN = pg.CRN
+                WHERE pg.matricula = %s AND r.CRN = %s
+            """, (matricula, CRN))
+            promedio = cursor.fetchone()[0]
+            return jsonify({'matricula': matricula, 'CRN': CRN, 'promedio': promedio})
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+
+@app.route('/calificacion/minima', methods=['GET'])
+def obtener_calificacion_minima():
+    if 'username' not in session:
+        return jsonify({'error': 'No has iniciado sesión'}), 401
+
+    username = session['username']
+
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("""
+                SELECT MIN(calificacion) AS calificacion_minima
+                FROM Calificacion
+                WHERE matriculaProfesor = %s
+            """, (username,))
+            resultado = cursor.fetchone()
+
+            if resultado and resultado['calificacion_minima'] is not None:
+                return jsonify({'calificacion_minima': resultado['calificacion_minima']})
+            else:
+                return jsonify({'error': 'No se encontraron calificaciones'}), 404
+
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
+@app.route('/promedio_general_profesor/<string:matricula>', methods=['GET'])
+def promedio_general_profesor(matricula):
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT AVG(CAST(r.respuesta AS FLOAT))
+                FROM Responde r
+                JOIN ProfesorGrupo pg ON r.CRN = pg.CRN
+                WHERE pg.matricula = %s
+            """, (matricula,))
+            promedio = cursor.fetchone()[0]
+            return jsonify({'matricula': matricula, 'promedio_general': promedio})
+        except Exception as e:
+            return jsonify({'error': f'Error en BD: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 @app.route('/Permisos', methods=['GET'])
 def get_nombres_permisos():
@@ -391,6 +504,38 @@ def get_usuarios():
             conn.close()
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+
+@app.route('/preguntas', methods=['GET'])
+def get_preguntas():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Pregunta")
+            pregunta = cursor.fetchall()
+            return jsonify(pregunta), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener usuarios: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
+    
+@app.route('/respuestas', methods=['GET'])
+def get_respuestas():
+    conn = get_db_connection()
+    if conn:
+        try:
+            cursor = conn.cursor(as_dict=True)
+            cursor.execute("SELECT * FROM Responde")
+            respuesta = cursor.fetchall()
+            return jsonify(respuesta), 200
+        except Exception as e:
+            return jsonify({'error': f'Error al obtener usuarios: {e}'}), 500
+        finally:
+            conn.close()
+    else:
+        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
   
 @app.route('/materias/nombres', methods=['GET'])
 def get_nombres_materias():
@@ -444,6 +589,7 @@ def get_grupo():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
+
 @app.route('/subir_encuesta', methods=['POST'])
 def subir_encuesta():
     if 'file' not in request.files:
@@ -455,15 +601,19 @@ def subir_encuesta():
 
     try:
         df = pd.read_excel(file)
+        df.columns = [str(col) for col in df.columns]
     except Exception as e:
         return f"Error al leer el archivo Excel: {str(e)}", 400
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    preguntas = df.columns[5:]  
+    # Identificar columnas que son preguntas (ignorar profesor, clase, etc.)
+    columnas_fijas = ['Matricula', 'Grupo', 'Comentarios', 'Profesor', 'Clase']
+    preguntas = [col for col in df.columns if col not in columnas_fijas]
     pregunta_ids = []
 
+    # Insertar preguntas si no existen
     for pregunta in preguntas:
         cursor.execute("SELECT idPregunta FROM Pregunta WHERE pregunta = %s", (pregunta,))
         row = cursor.fetchone()
@@ -481,13 +631,13 @@ def subir_encuesta():
         profesor_nombre = row['Profesor']
         clase = row['Clase']
 
+        # Procesar nombre del profesor
         partes = profesor_nombre.split(',')
-        apellido = partes[0].strip()
-        nombre = partes[1].strip()
-        nombre_parts = nombre.split()
+        apellido_paterno = partes[0].strip()
+        nombre_completo = partes[1].strip()
+        nombre_parts = nombre_completo.split()
         nombre_prof = nombre_parts[0]
         apellido_materno = nombre_parts[-1] if len(nombre_parts) > 1 else ''
-        apellido_paterno = apellido
 
         cursor.execute("""
             SELECT matricula FROM Profesor
@@ -498,49 +648,52 @@ def subir_encuesta():
         if row_prof:
             matricula_prof = row_prof[0]
         else:
-            matricula_prof = f"P{hash(profesor_nombre) % 10000}"
+            hash_input = (profesor_nombre).encode()
+            matricula_prof = "P" + hashlib.sha256(hash_input).hexdigest()[:6]
             cursor.execute("""
                 INSERT INTO Profesor(matricula, nombre, apellidoPaterno, apellidoMaterno, rol, idDepartamento)
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (matricula_prof, nombre_prof, apellido_paterno, apellido_materno, 'Profesor', 1))
 
+        # Verificar o crear materia
         cursor.execute("SELECT clave FROM Materia WHERE nombre = %s", (clase,))
         row_mat = cursor.fetchone()
-
         if row_mat:
             clave = row_mat[0]
         else:
             clave = hash(clase) % 10000
-            cursor.execute("INSERT INTO Materia(clave, nombre, idDepartamento) VALUES (%s, %s, %s)",
-                           (clave, clase, 1))
+            cursor.execute("INSERT INTO Materia(clave, nombre, idDepartamento) VALUES (%s, %s, %s)", (clave, clase, 1))
 
-        cursor.execute("""
-            SELECT CRN FROM Grupo
-            WHERE clave = %s
-        """, (clave,))
+        # Verificar o crear grupo
+        cursor.execute("SELECT CRN FROM Grupo WHERE clave = %s", (clave,))
         row_grp = cursor.fetchone()
-
         if row_grp:
             crn = row_grp[0]
         else:
             crn = hash(grupo_str + clase) % 10000
             cursor.execute("INSERT INTO Grupo(CRN, idPeriodo, clave) VALUES (%s, %s, %s)", (crn, 1, clave))
 
+        # Relacionar grupo con profesor
         cursor.execute("SELECT * FROM ProfesorGrupo WHERE CRN = %s AND matricula = %s", (crn, matricula_prof))
         if not cursor.fetchone():
             cursor.execute("INSERT INTO ProfesorGrupo(CRN, matricula) VALUES (%s, %s)", (crn, matricula_prof))
 
+        # Verificar o crear alumno
         cursor.execute("SELECT * FROM Alumno WHERE matricula = %s", (matricula,))
         if not cursor.fetchone():
-            cursor.execute("INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno) VALUES (%s, %s, %s, %s)",
-                           (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
+            cursor.execute("""
+                INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno)
+                VALUES (%s, %s, %s, %s)
+            """, (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
 
-        for i, pid in enumerate(pregunta_ids):
-            respuesta = row[i + 5]
+        # Guardar respuestas
+        for pregunta_col, pid in zip(preguntas, pregunta_ids):
+            respuesta = row[pregunta_col]
 
             cursor.execute("""
                 SELECT 1 FROM Responde WHERE matricula = %s AND idPregunta = %s AND CRN = %s
             """, (matricula, pid, crn))
+
             if cursor.fetchone():
                 cursor.execute("""
                     UPDATE Responde
@@ -553,11 +706,11 @@ def subir_encuesta():
                     VALUES (%s, %s, %s, %s)
                 """, (matricula, pid, crn, str(respuesta)))
 
-                if i == 0 and pd.notna(comentario):
-                    cursor.execute("""
-                        INSERT INTO Comenta(idPregunta, matricula, CRN, comentario)
-                        VALUES (%s, %s, %s, %s)
-                    """, (pid, matricula, crn, comentario))
+        # Guardar comentario
+        cursor.execute("""
+            INSERT INTO Comenta(matricula, CRN, comentario)
+            VALUES (%s, %s, %s)
+        """, (matricula, crn, comentario))
 
     conn.commit()
     cursor.close()
@@ -565,4 +718,4 @@ def subir_encuesta():
     return jsonify({"message": "Datos cargados correctamente"}), 200
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
