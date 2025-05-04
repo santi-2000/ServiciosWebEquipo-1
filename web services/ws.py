@@ -454,7 +454,6 @@ def subir_encuesta():
         return "El nombre del archivo está vacío", 400
 
     try:
-        # Leer el archivo Excel en un DataFrame de pandas
         df = pd.read_excel(file)
     except Exception as e:
         return f"Error al leer el archivo Excel: {str(e)}", 400
@@ -462,8 +461,7 @@ def subir_encuesta():
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Obtener preguntas y agregarlas si no existen
-    preguntas = df.columns[5:]  # desde la columna F en adelante
+    preguntas = df.columns[5:]  
     pregunta_ids = []
 
     for pregunta in preguntas:
@@ -483,7 +481,6 @@ def subir_encuesta():
         profesor_nombre = row['Profesor']
         clase = row['Clase']
 
-        # Dividir el nombre del profesor
         partes = profesor_nombre.split(',')
         apellido = partes[0].strip()
         nombre = partes[1].strip()
@@ -492,7 +489,6 @@ def subir_encuesta():
         apellido_materno = nombre_parts[-1] if len(nombre_parts) > 1 else ''
         apellido_paterno = apellido
 
-        # Crear profesor si no existe
         cursor.execute("""
             SELECT matricula FROM Profesor
             WHERE nombre = %s AND apellidoPaterno = %s AND apellidoMaterno = %s
@@ -508,7 +504,6 @@ def subir_encuesta():
                 VALUES (%s, %s, %s, %s, %s, %s)
             """, (matricula_prof, nombre_prof, apellido_paterno, apellido_materno, 'Profesor', 1))
 
-        # Crear materia si no existe
         cursor.execute("SELECT clave FROM Materia WHERE nombre = %s", (clase,))
         row_mat = cursor.fetchone()
 
@@ -519,7 +514,6 @@ def subir_encuesta():
             cursor.execute("INSERT INTO Materia(clave, nombre, idDepartamento) VALUES (%s, %s, %s)",
                            (clave, clase, 1))
 
-        # Crear grupo si no existe
         cursor.execute("""
             SELECT CRN FROM Grupo
             WHERE clave = %s
@@ -532,40 +526,33 @@ def subir_encuesta():
             crn = hash(grupo_str + clase) % 10000
             cursor.execute("INSERT INTO Grupo(CRN, idPeriodo, clave) VALUES (%s, %s, %s)", (crn, 1, clave))
 
-        # Relacionar grupo con profesor
         cursor.execute("SELECT * FROM ProfesorGrupo WHERE CRN = %s AND matricula = %s", (crn, matricula_prof))
         if not cursor.fetchone():
             cursor.execute("INSERT INTO ProfesorGrupo(CRN, matricula) VALUES (%s, %s)", (crn, matricula_prof))
 
-        # Crear alumno si no existe
         cursor.execute("SELECT * FROM Alumno WHERE matricula = %s", (matricula,))
         if not cursor.fetchone():
             cursor.execute("INSERT INTO Alumno(matricula, nombre, apellidoPaterno, apellidoMaterno) VALUES (%s, %s, %s, %s)",
                            (matricula, 'Nombre', 'ApellidoP', 'ApellidoM'))
 
-        # Insertar o actualizar respuestas y comentario
         for i, pid in enumerate(pregunta_ids):
             respuesta = row[i + 5]
 
-            # Verificar si ya existe una respuesta para la combinación (matricula, idPregunta, CRN)
             cursor.execute("""
                 SELECT 1 FROM Responde WHERE matricula = %s AND idPregunta = %s AND CRN = %s
             """, (matricula, pid, crn))
             if cursor.fetchone():
-                # Si existe, actualizar la respuesta
                 cursor.execute("""
                     UPDATE Responde
                     SET respuesta = %s
                     WHERE matricula = %s AND idPregunta = %s AND CRN = %s
                 """, (str(respuesta), matricula, pid, crn))
             else:
-                # Si no existe, insertar la respuesta
                 cursor.execute("""
                     INSERT INTO Responde(matricula, idPregunta, CRN, respuesta)
                     VALUES (%s, %s, %s, %s)
                 """, (matricula, pid, crn, str(respuesta)))
 
-                # Comentarios se asocian a la primera pregunta
                 if i == 0 and pd.notna(comentario):
                     cursor.execute("""
                         INSERT INTO Comenta(idPregunta, matricula, CRN, comentario)
