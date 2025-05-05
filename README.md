@@ -29,7 +29,6 @@ source ~/.bashrc
 
 pip install pandas openpyxl
 pip install unidecode
-
 ```
 
 ### Usar sqlcmd para conectarse desde la terminal
