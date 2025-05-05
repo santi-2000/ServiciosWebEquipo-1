@@ -81,37 +81,6 @@ def login():
     else:
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
-
-@app.route('/usuario', methods=['GET'])
-def obtener_usuario():
-    if 'username' not in session:
-        return jsonify({'error': 'No has iniciado sesión'}), 401
-
-    username = session['username']
-
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor(as_dict=True)
-            cursor.execute("""
-                SELECT nombre, apellidoPaterno, apellidoMaterno, rol
-                FROM Profesor
-                WHERE matricula = %s
-            """, (username,))
-            profesor = cursor.fetchone()
-
-            if profesor:
-                nombre_completo = f"{profesor['nombre']} {profesor['apellidoPaterno']} {profesor['apellidoMaterno']}"
-                return nombre_completo
-            else:
-                return jsonify({'error': 'Profesor no encontrado'}), 404
-
-        except Exception as e:
-            return jsonify({'error': f'Error en BD: {e}'}), 500
-        finally:
-            conn.close()
-    else:
-        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
 @app.route('/profesores/rol', methods=['GET'])
 def get_roles_profesor():
@@ -230,21 +199,6 @@ def create_profesor():
         return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
 
 
-@app.route('/departamentos', methods=['GET'])
-def get_departamentos():
-    conn = get_db_connection()
-    if conn:
-        try:
-            cursor = conn.cursor(as_dict=True)
-            cursor.execute("SELECT * FROM Departamento")
-            departamentos = cursor.fetchall()
-            return jsonify(departamentos), 200
-        except Exception as e:
-            return jsonify({'error': f'Error al obtener departamentos: {e}'}), 500
-        finally:
-            conn.close()
-    else:
-        return jsonify({'error': 'No se pudo conectar a la base de datos'}), 500
     
 @app.route('/Departamento/nombres', methods=['GET'])
 def get_nombres_grupos():
